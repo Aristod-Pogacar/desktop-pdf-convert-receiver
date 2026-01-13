@@ -3,8 +3,8 @@ const fs = require("fs");
 
 const socket = io("http://localhost:3000");
 
-const files1 = ["test1.pdf", "test2.pdf", "test3.pdf", "test4.pdf"];
-const files2 = ["test5.pdf", "test6.pdf", "test7.pdf", "test8.pdf"];
+const files1 = ["test1.pdf", "test2.pdf", "test3.pdf"];
+const files2 = ["test5.pdf", "test6.pdf", "test7.pdf", "test8.pdf", "test4.pdf"];
 
 files1.forEach((file) => {
     socket.emit("send-pdf", {

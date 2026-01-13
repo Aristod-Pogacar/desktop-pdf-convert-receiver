@@ -23,6 +23,7 @@ function renderTransfers() {
     transferList.innerHTML = "";
 
     const entries = Object.values(transfers);
+    console.log("Liste des transferts :", transfers);
 
     if (entries.length === 0) {
         const li = document.createElement("li");

@@ -1,7 +1,7 @@
 {
   "name": "desktop-pdf-convert-receiver",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Application Electron pour recevoir des PDFs",
   "homepage": "https://github.com/Aristod-Pogacar/desktop-pdf-convert-receiver#readme",
   "bugs": {
     "url": "https://github.com/Aristod-Pogacar/desktop-pdf-convert-receiver/issues"
@@ -17,11 +17,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
-    "dev": "electronmon ."
+    "dev": "electronmon .",
+    "build": "electron-builder"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "electron": "^39.2.7",
     "express": "^5.2.1",
     "ip": "^2.0.1",
     "multer": "^2.0.2",
@@ -31,6 +31,20 @@
   },
   "devDependencies": {
     "electron-builder": "^26.4.0",
-    "electronmon": "^2.0.4"
+    "electronmon": "^2.0.4",
+    "electron": "^39.2.7"
+  },
+  "build": {
+    "appId": "com.aristod.pdfreceiver",
+    "productName": "PDFReceiver",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": "portable"
+    }
   }
 }
