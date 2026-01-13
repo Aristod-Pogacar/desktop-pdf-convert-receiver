@@ -1,8 +1,12 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const http = require("http");
 const ip = require("ip");
+
+const EXCEL_PATH = path.join(app.getPath("documents"), "PDF-Receiver", "transfers.xlsx");
+const SAVE_PATH = path.join(app.getPath("documents"), "PDF-Receiver");
 
 let win;
 
@@ -17,6 +21,21 @@ function createWindow() {
 
     win.loadFile("renderer/index.html");
 }
+ipcMain.handle("open-excel", async () => {
+    if (fs.existsSync(EXCEL_PATH)) {
+        await shell.openPath(EXCEL_PATH);
+        return { ok: true };
+    }
+    return { ok: false, error: "Fichier Excel introuvable" };
+});
+
+ipcMain.handle("open-pdf-folder", async () => {
+    if (fs.existsSync(SAVE_PATH)) {
+        await shell.openPath(SAVE_PATH);
+        return { ok: true };
+    }
+    return { ok: false, error: "Dossier PDF introuvable" };
+});
 
 app.whenReady().then(() => {
     createWindow();

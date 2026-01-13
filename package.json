@@ -27,12 +27,13 @@
     "multer": "^2.0.2",
     "pdfkit": "^0.17.2",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "electron": "^39.2.7",
     "electron-builder": "^26.4.0",
-    "electronmon": "^2.0.4",
-    "electron": "^39.2.7"
+    "electronmon": "^2.0.4"
   },
   "build": {
     "appId": "com.aristod.pdfreceiver",

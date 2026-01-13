@@ -2,11 +2,41 @@ const { Server } = require("socket.io");
 const fs = require("fs");
 const path = require("path");
 const { app } = require("electron");
+const XLSX = require("xlsx");
 
-// const BASE_DIR = path.join(app.getPath("documents"), "PDF-Receiver");
-
-const BASE_DIR = "C:/PDF-Reception";
 const transfers = new Map();
+
+const EXCEL_PATH = path.join(app.getPath("documents"), "PDF-Receiver", "transfers.xlsx");
+
+function logTransferToExcel(matricule, totalFiles) {
+    let workbook;
+    let worksheet;
+    const sheetName = "Transferts";
+
+    if (fs.existsSync(EXCEL_PATH)) {
+        workbook = XLSX.readFile(EXCEL_PATH);
+        worksheet = workbook.Sheets[sheetName];
+    } else {
+        workbook = XLSX.utils.book_new();
+        worksheet = XLSX.utils.aoa_to_sheet([
+            ["Matricule", "Fichiers reçus", "Date", "Heure"]
+        ]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    }
+
+    const now = new Date();
+    const row = [
+        matricule,
+        totalFiles,
+        now.toLocaleDateString(),
+        now.toLocaleTimeString()
+    ];
+
+    XLSX.utils.sheet_add_aoa(worksheet, [row], { origin: -1 });
+    XLSX.writeFile(workbook, EXCEL_PATH);
+
+    console.log(`📊 Excel mis à jour → ${matricule}`);
+}
 
 module.exports = function startSocketServer(httpServer, notifyUI) {
     const io = new Server(httpServer, {
@@ -55,18 +85,10 @@ module.exports = function startSocketServer(httpServer, notifyUI) {
                 received: count,
                 total
             }));
-            // // ✅ Tous les fichiers reçus → on répond AU téléphone
-            // if (count === total && !completedTransfers.has(transferKey)) {
-            //     completedTransfers.add(transferKey);
-
-            //     ack({
-            //         status: "ok",
-            //         message: `Documents ${matricule} reçus avec succès`
-            //     });
-            // }
 
             // ✅ ACK envoyé UNE SEULE FOIS
             if (transfer.received === transfer.total) {
+                logTransferToExcel(matricule, transfer.total);
                 ack({
                     status: "ok",
                     message: `Documents ${matricule} reçus`

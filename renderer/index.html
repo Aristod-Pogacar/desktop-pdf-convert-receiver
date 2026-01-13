@@ -98,6 +98,32 @@
             color: #64748b;
             margin-top: 30px;
         }
+
+        .button {
+            background: #38bdf8;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .button:hover {
+            background: #2563eb;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            width: 100%;
+            justify-content: center;
+            justify-items: center;
+            align-items: center;
+            align-content: center;
+        }
     </style>
 </head>
 
@@ -112,6 +138,11 @@
         <div class="ip-hint">
             👉 Entrez cette adresse IP dans l’application mobile
         </div>
+    </div>
+
+    <div class="actions">
+        <button id="openExcel" class="button">📊 Ouvrir l'historique Excel</button>
+        <button id="openFolder" class="button">📂 Ouvrir le dossier des PDF</button>
     </div>
 
     <!-- TRANSFERS -->

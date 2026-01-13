@@ -57,3 +57,13 @@ function renderTransfers() {
 }
 
 console.log("Renderer chargé à", new Date().toISOString());
+
+document.getElementById("openExcel").addEventListener("click", async () => {
+    const res = await window.api.openExcel();
+    if (!res.ok) alert(res.error);
+});
+
+document.getElementById("openFolder").addEventListener("click", async () => {
+    const res = await window.api.openPdfFolder();
+    if (!res.ok) alert(res.error);
+});
