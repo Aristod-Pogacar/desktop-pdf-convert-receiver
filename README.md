@@ -1,4 +1,4 @@
-# 📥 Electron PDF Receiver
+# 📥 Desktop pdf convert receiver
 
 Application **Electron Desktop** servant de **serveur de réception de fichiers PDF** envoyés depuis une application mobile via **Socket.IO**.
 
@@ -65,8 +65,8 @@ electron-pdf-receiver/
 
 ### 1️⃣ Cloner le projet
 ```bash
-git clone <url-du-repo>
-cd electron-pdf-receiver
+git clone https://github.com/Aristod-Pogacar/desktop-pdf-convert-receiver.git
+cd desktop-pdf-convert-receiver
 ````
 
 ### 2️⃣ Installer les dépendances
