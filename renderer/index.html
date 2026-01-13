@@ -122,56 +122,7 @@
             <li class="empty">Aucun transfert pour le moment</li>
         </ul>
     </div>
-
-    <script>
-        const transfers = {};
-
-        // Reçoit l'adresse IP depuis Electron
-        window.electron.onIP((ip) => {
-            document.getElementById("ip").innerText = ip;
-        });
-
-        // Mise à jour des transferts
-        window.electron.onUpdate((data) => {
-            transfers[data.matricule] = data;
-            renderTransfers();
-        });
-
-        function renderTransfers() {
-            const list = document.getElementById("transferList");
-            list.innerHTML = "";
-
-            const values = Object.values(transfers);
-
-            if (values.length === 0) {
-                list.innerHTML = `<li class="empty">Aucun transfert pour le moment</li>`;
-                return;
-            }
-
-            values.forEach(t => {
-                const li = document.createElement("li");
-                li.className = "transfer-item";
-
-                const name = document.createElement("div");
-                name.className = "folder-name";
-                name.innerText = t.matricule;
-
-                const progress = document.createElement("div");
-                progress.className = "progress";
-                progress.innerText = `${t.received} / ${t.total}`;
-
-                if (t.received >= t.total) {
-                    progress.classList.add("completed");
-                    progress.innerText += " ✓";
-                }
-
-                li.appendChild(name);
-                li.appendChild(progress);
-                list.appendChild(li);
-            });
-        }
-    </script>
-    <!-- <script src="renderer.js"></script> -->
+    <script src="renderer.js"></script>
 
 </body>
 
