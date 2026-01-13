@@ -1,8 +1,8 @@
 const folders = {};
 
-window.electron.onIP((ip) => {
-    document.getElementById("ip").innerText = `Adresse IP : ${ip}`;
-});
+// window.electron.onIP((ip) => {
+//     document.getElementById("ip").innerText = `Adresse IP : ${ip}`;
+// });
 
 window.electron.onUpdate((data) => {
     folders[data.matricule] = data;

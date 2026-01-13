@@ -8,6 +8,7 @@ module.exports = function startSocketServer(httpServer, notifyUI) {
     });
 
     io.on("connection", (socket) => {
+        console.log("Client connected");
         socket.on("send-pdf", ({ matricule, fileName, fileBuffer, total }) => {
             const dir = path.join(__dirname, "..", "received", matricule);
 
