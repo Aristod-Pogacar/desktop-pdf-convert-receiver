@@ -30,6 +30,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "electron-builder": "^26.4.0",
     "electronmon": "^2.0.4"
   }
 }
