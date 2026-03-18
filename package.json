@@ -1,6 +1,6 @@
 {
   "name": "desktop-pdf-convert-receiver",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Application Electron pour recevoir des PDFs",
   "homepage": "https://github.com/Aristod-Pogacar/desktop-pdf-convert-receiver#readme",
   "bugs": {

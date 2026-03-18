@@ -63,6 +63,15 @@ module.exports = function startSocketServer(httpServer, notifyUI) {
 
             const count = fs.readdirSync(dir).length;
             console.log("Fichier enregistré dans :", path.join(dir, fileName));
+            const dataFile = {
+                matricule,
+                fileName,
+                count,
+                total
+            }
+            console.log("DATA FILE:", dataFile);
+
+            socket.emit("file-received", dataFile);
 
             const key = `${socket.id}_${matricule}`;
 
