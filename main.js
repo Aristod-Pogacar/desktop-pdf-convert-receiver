@@ -13,7 +13,7 @@ let win;
 function createWindow() {
     win = new BrowserWindow({
         width: 600,
-        height: 400,
+        height: 700,
         webPreferences: {
             preload: path.join(__dirname, "preload.js")
         }
@@ -37,6 +37,18 @@ ipcMain.handle("open-pdf-folder", async () => {
     return { ok: false, error: "Dossier PDF introuvable" };
 });
 
+let globalPassword = "";
+
+ipcMain.on("set-password", (event, password) => {
+    globalPassword = password;
+    console.log("Password mis à jour");
+});
+
+// fonction pour récupérer le password
+function getPassword() {
+    return globalPassword;
+}
+
 app.whenReady().then(() => {
     createWindow();
 
@@ -47,7 +59,7 @@ app.whenReady().then(() => {
 
     startSocket(server, (data) => {
         win.webContents.send("update-folder", data);
-    });
+    }, getPassword);
 
     server.listen(3000, () => {
         win.webContents.once("did-finish-load", () => {

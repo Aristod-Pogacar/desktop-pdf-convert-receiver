@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("electron", {
     onUpdate: (cb) => ipcRenderer.on("update-folder", (_, data) => cb(data))
 });
 contextBridge.exposeInMainWorld("api", {
+    setPassword: (password) => ipcRenderer.send("set-password", password),
     openExcel: () => ipcRenderer.invoke("open-excel"),
     openPdfFolder: () => ipcRenderer.invoke("open-pdf-folder")
 });

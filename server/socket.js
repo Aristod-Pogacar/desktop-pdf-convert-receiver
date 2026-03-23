@@ -3,10 +3,75 @@ const fs = require("fs");
 const path = require("path");
 const { app } = require("electron");
 const XLSX = require("xlsx");
+const { PDFDocument } = require("pdf-lib");
+const { execFileSync } = require("child_process");
 
 const transfers = new Map();
 
 const EXCEL_PATH = path.join(app.getPath("documents"), "PDF-Receiver", "transfers.xlsx");
+
+function getQpdfPath() {
+    // if (process.env.NODE_ENV === "development") {
+    //     return path.join(__dirname, "..", "qpdf", "qpdf.exe");
+    // } else {
+    return path.join(app.getAppPath(), "qpdf", "qpdf.exe");
+    // }
+}
+
+function protectPDF(filePath, password) {
+
+    try {
+        const qpdfPath = getQpdfPath();
+        // console.log("QPDF PATH:", qpdfPath);
+        // console.log("EXISTS:", fs.existsSync(qpdfPath));
+        const tempPath = filePath + ".secure.pdf";
+        const args = [
+            "--encrypt",
+            password,
+            password,
+            "256",
+            "--",
+            filePath,
+            tempPath
+        ];
+        console.log("ARGS:", args, { encoding: 'utf8' });
+        execFileSync(qpdfPath, args);
+
+        fs.unlinkSync(filePath);
+        fs.renameSync(tempPath, filePath);
+
+        console.log("🔐 PDF sécurisé :", filePath);
+    } catch (err) {
+        console.error("Erreur qpdf :", err);
+    }
+}
+// async function protectPDF(filePath, password) {
+//     if (!password) return;
+
+//     try {
+//         const existingPdfBytes = fs.readFileSync(filePath);
+
+//         const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+//         const pdfBytes = await pdfDoc.save({
+//             userPassword: "12345",
+//             ownerPassword: "12345",
+//             // userPassword: password,
+//             // ownerPassword: password,
+//             permissions: {
+//                 printing: "highResolution",
+//                 modifying: false,
+//                 copying: false,
+//             },
+//         });
+
+//         fs.writeFileSync(filePath, pdfBytes);
+
+//         console.log("🔐 PDF sécurisé :", filePath);
+//     } catch (err) {
+//         console.error("Erreur protection PDF :", err);
+//     }
+// }
 
 function logTransferToExcel(matricule, totalFiles) {
     let workbook;
@@ -38,7 +103,14 @@ function logTransferToExcel(matricule, totalFiles) {
     console.log(`📊 Excel mis à jour → ${matricule}`);
 }
 
-module.exports = function startSocketServer(httpServer, notifyUI) {
+module.exports = function startSocketServer(httpServer, notifyUI, getPassword) {
+    const rootPath = app.getAppPath();
+    const qpdfPath = getQpdfPath();
+    console.log("QPDF PATH:", qpdfPath);
+    console.log("ROOT PATH:", rootPath);
+    console.log("EXISTS:", fs.existsSync(qpdfPath));
+
+    console.log("PASSWORD:", getPassword());
     const io = new Server(httpServer, {
         maxHttpBufferSize: 1e8
     });
@@ -59,10 +131,18 @@ module.exports = function startSocketServer(httpServer, notifyUI) {
             const transferKey = `${socket.id}_${matricule}`;
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-            fs.writeFileSync(path.join(dir, fileName), Buffer.from(fileBuffer));
+            // fs.writeFileSync(path.join(dir, fileName), Buffer.from(fileBuffer));
+            const filePath = path.join(dir, fileName);
+
+            fs.writeFileSync(filePath, Buffer.from(fileBuffer));
+
+            console.log("PASSWORD:", getPassword())
+
+            // 🔐 protéger ici
+            protectPDF(filePath, getPassword());
 
             const count = fs.readdirSync(dir).length;
-            console.log("Fichier enregistré dans :", path.join(dir, fileName));
+            console.log("Fichier enregistré dans :", filePath);
             const dataFile = {
                 matricule,
                 fileName,

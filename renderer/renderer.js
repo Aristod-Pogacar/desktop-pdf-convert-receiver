@@ -1,6 +1,39 @@
 const ipElement = document.getElementById("ip");
 const transferList = document.getElementById("transferList");
+const passwordInput = document.getElementById("pdfPassword");
 
+// Charger le mot de passe sauvegardé
+const savedPassword = localStorage.getItem("pdfPassword");
+
+if (savedPassword && passwordInput) {
+    passwordInput.value = savedPassword;
+}
+// Sauvegarder automatiquement quand ça change
+if (passwordInput) {
+    passwordInput.addEventListener("input", () => {
+        console.log("PASSWORD:", passwordInput.value);
+        localStorage.setItem("pdfPassword", passwordInput.value);
+    });
+}
+
+function getPassword() {
+    return localStorage.getItem("pdfPassword") || "";
+}
+
+// envoyer au main
+function sendPasswordToMain() {
+    const password = getPassword();
+    window.api.setPassword(password);
+}
+
+// envoyer au démarrage
+sendPasswordToMain();
+
+// envoyer à chaque changement
+passwordInput.addEventListener("input", () => {
+    localStorage.setItem("pdfPassword", passwordInput.value);
+    sendPasswordToMain();
+});
 // Stockage en mémoire des transferts
 const transfers = {};
 
@@ -13,9 +46,13 @@ window.electron.onIP((ip) => {
 
 // Mise à jour des transferts
 window.electron.onUpdate((data) => {
+    data.password = getPassword(); // 🔐 ajout ici
     transfers[data.matricule] = data;
     renderTransfers();
-});
+});// window.electron.onUpdate((data) => {
+//     transfers[data.matricule] = data;
+//     renderTransfers();
+// });
 
 function renderTransfers() {
     if (!transferList) return;
