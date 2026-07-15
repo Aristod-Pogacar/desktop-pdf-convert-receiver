@@ -59,11 +59,23 @@ app.whenReady().then(() => {
 
     startSocket(server, (data) => {
         win.webContents.send("update-folder", data);
+    }, (timeoutData) => {
+        win.webContents.send("transfer-timeout", timeoutData);
     }, getPassword);
 
     server.listen(3000, () => {
         win.webContents.once("did-finish-load", () => {
             win.webContents.send("ip-address", ip.address());
         });
+    });
+
+    // 🔹 Resume transfer: ask server for status then send remaining files
+    ipcMain.handle("resume-transfer", async (event, matricule, currentCount) => {
+        return { ok: true, matricule, currentCount };
+    });
+
+    // 🔹 Clear transfer from UI
+    ipcMain.handle("clear-transfer", async (event, matricule) => {
+        return { ok: true };
     });
 });

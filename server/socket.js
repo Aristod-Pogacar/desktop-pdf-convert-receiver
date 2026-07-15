@@ -7,23 +7,17 @@ const { PDFDocument } = require("pdf-lib");
 const { execFileSync } = require("child_process");
 
 const transfers = new Map();
+const TRANSFER_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes d'inactivité = timeout
 
 const EXCEL_PATH = path.join(app.getPath("documents"), "PDF-Receiver", "transfers.xlsx");
 
 function getQpdfPath() {
-    // if (process.env.NODE_ENV === "development") {
-    //     return path.join(__dirname, "..", "qpdf", "qpdf.exe");
-    // } else {
     return path.join(app.getAppPath(), "qpdf", "qpdf.exe");
-    // }
 }
 
 function protectPDF(filePath, password) {
-
     try {
         const qpdfPath = getQpdfPath();
-        // console.log("QPDF PATH:", qpdfPath);
-        // console.log("EXISTS:", fs.existsSync(qpdfPath));
         const tempPath = filePath + ".secure.pdf";
         const args = [
             "--encrypt",
@@ -34,44 +28,14 @@ function protectPDF(filePath, password) {
             filePath,
             tempPath
         ];
-        console.log("ARGS:", args, { encoding: 'utf8' });
         execFileSync(qpdfPath, args);
-
         fs.unlinkSync(filePath);
         fs.renameSync(tempPath, filePath);
-
         console.log("🔐 PDF sécurisé :", filePath);
     } catch (err) {
         console.error("Erreur qpdf :", err);
     }
 }
-// async function protectPDF(filePath, password) {
-//     if (!password) return;
-
-//     try {
-//         const existingPdfBytes = fs.readFileSync(filePath);
-
-//         const pdfDoc = await PDFDocument.load(existingPdfBytes);
-
-//         const pdfBytes = await pdfDoc.save({
-//             userPassword: "12345",
-//             ownerPassword: "12345",
-//             // userPassword: password,
-//             // ownerPassword: password,
-//             permissions: {
-//                 printing: "highResolution",
-//                 modifying: false,
-//                 copying: false,
-//             },
-//         });
-
-//         fs.writeFileSync(filePath, pdfBytes);
-
-//         console.log("🔐 PDF sécurisé :", filePath);
-//     } catch (err) {
-//         console.error("Erreur protection PDF :", err);
-//     }
-// }
 
 function logTransferToExcel(matricule, totalFiles) {
     let workbook;
@@ -103,89 +67,150 @@ function logTransferToExcel(matricule, totalFiles) {
     console.log(`📊 Excel mis à jour → ${matricule}`);
 }
 
-module.exports = function startSocketServer(httpServer, notifyUI, getPassword) {
-    const rootPath = app.getAppPath();
-    const qpdfPath = getQpdfPath();
-    console.log("QPDF PATH:", qpdfPath);
-    console.log("ROOT PATH:", rootPath);
-    console.log("EXISTS:", fs.existsSync(qpdfPath));
+function checkTransferTimeouts(io, notifyTimeout) {
+    const now = Date.now();
+    for (const [key, transfer] of transfers.entries()) {
+        if (transfer.received < transfer.total && transfer.lastActivity) {
+            if (now - transfer.lastActivity > TRANSFER_TIMEOUT_MS) {
+                console.log(`⏱️ Transfert timeout: ${key} (${transfer.received}/${transfer.total})`);
+                transfer.timedOut = true;
+                const timeoutData = {
+                    matricule: transfer.matricule,
+                    received: transfer.received,
+                    total: transfer.total,
+                    files: Array.from(transfer.receivedNames)
+                };
+                io.to(key.split("_")[0]).emit("transfer-timeout", timeoutData);
+                if (notifyTimeout) {
+                    notifyTimeout(timeoutData);
+                }
+            }
+        }
+    }
+}
 
+module.exports = function startSocketServer(httpServer, notifyUI, notifyTimeout, getPassword) {
+    console.log("QPDF PATH:", getQpdfPath());
+    console.log("EXISTS:", fs.existsSync(getQpdfPath()));
     console.log("PASSWORD:", getPassword());
+
     const io = new Server(httpServer, {
         maxHttpBufferSize: 1e8
     });
 
+    setInterval(() => checkTransferTimeouts(io, notifyTimeout), 30000);
+
     io.on("connection", (socket) => {
         console.log("Client connected");
-        /*
-        key = socket.id + matricule
-        value = { received: number, total: number }
-        */
+
         socket.on("send-pdf", ({ matricule, fileName, fileBuffer, total }, ack) => {
-            // const dir = path.join(__dirname, "..", "received", matricule);
-            // const dir = path.join(BASE_DIR, matricule);
             const dir = path.join(app.getPath("documents"), "PDF-Receiver", matricule);
-            // const exeDir = path.dirname(process.execPath);
-            // const dir = path.join(exeDir, "received", matricule);
-            console.log("DIR:", dir);
             const transferKey = `${socket.id}_${matricule}`;
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-            // fs.writeFileSync(path.join(dir, fileName), Buffer.from(fileBuffer));
             const filePath = path.join(dir, fileName);
+            let fileStatus = "ok";
+            let fileError = null;
 
-            fs.writeFileSync(filePath, Buffer.from(fileBuffer));
-
-            console.log("PASSWORD:", getPassword())
-
-            // 🔐 protéger ici
-            protectPDF(filePath, getPassword());
+            try {
+                fs.writeFileSync(filePath, Buffer.from(fileBuffer));
+                try {
+                    protectPDF(filePath, getPassword());
+                } catch (protectErr) {
+                    console.error("Erreur protection PDF:", protectErr);
+                }
+            } catch (err) {
+                console.error("Erreur sauvegarde fichier:", err);
+                fileStatus = "error";
+                fileError = err.message;
+            }
 
             const count = fs.readdirSync(dir).length;
-            console.log("Fichier enregistré dans :", filePath);
-            const dataFile = {
+
+            socket.emit("file-received", {
                 matricule,
                 fileName,
                 count,
-                total
-            }
-            console.log("DATA FILE:", dataFile);
-
-            socket.emit("file-received", dataFile);
+                total,
+                fileStatus,
+                fileError
+            });
 
             const key = `${socket.id}_${matricule}`;
 
             if (!transfers.has(key)) {
                 transfers.set(key, {
                     received: 0,
-                    total
+                    total,
+                    receivedNames: new Set(),
+                    matricule,
+                    lastActivity: Date.now(),
+                    timedOut: false
                 });
             }
 
             const transfer = transfers.get(key);
-            transfer.received += 1;
+
+            if (!transfer.receivedNames.has(fileName)) {
+                transfer.receivedNames.add(fileName);
+                transfer.received += 1;
+            }
+            transfer.lastActivity = Date.now();
 
             console.log(
                 `[${matricule}] ${transfer.received}/${transfer.total} → ${fileName}`
             );
 
-            notifyUI(({
+            notifyUI({
                 matricule,
                 received: count,
-                total
-            }));
+                total,
+                files: Array.from(transfer.receivedNames),
+                timedOut: transfer.timedOut
+            });
 
-            // ✅ ACK envoyé UNE SEULE FOIS
             if (transfer.received === transfer.total) {
                 logTransferToExcel(matricule, transfer.total);
-                ack({
-                    status: "ok",
-                    message: `Documents ${matricule} reçus`
-                });
-
-                transfers.delete(key); // 🔥 reset propre
+                if (ack) {
+                    ack({
+                        status: "ok",
+                        message: `Documents ${matricule} reçus`
+                    });
+                }
+                transfers.delete(key);
                 console.log(`[${matricule}] Transfert terminé`);
             }
+        });
+
+        socket.on("get-transfer-status", ({ matricule }, ack) => {
+            let found = null;
+            for (const [key, transfer] of transfers.entries()) {
+                if (transfer.matricule === matricule && key.startsWith(socket.id)) {
+                    found = transfer;
+                    break;
+                }
+            }
+            if (found) {
+                ack({
+                    status: "ok",
+                    received: found.received,
+                    total: found.total,
+                    files: Array.from(found.receivedNames),
+                    timedOut: found.timedOut
+                });
+            } else {
+                ack({
+                    status: "not_found"
+                });
+            }
+        });
+
+        socket.on("disconnect", () => {
+            console.log("Client disconnected");
+        });
+
+        socket.on("error", (error) => {
+            console.error("Socket error:", error);
         });
     });
 };
