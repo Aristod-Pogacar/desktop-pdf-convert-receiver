@@ -31,40 +31,148 @@ function protectPDF(filePath, password) {
         execFileSync(qpdfPath, args);
         fs.unlinkSync(filePath);
         fs.renameSync(tempPath, filePath);
-        console.log("🔐 PDF sécurisé :", filePath);
+        // console.log("🔐 PDF sécurisé :", filePath);
     } catch (err) {
         console.error("Erreur qpdf :", err);
     }
 }
 
-function logTransferToExcel(matricule, totalFiles) {
+function logTransferToExcel(matricule, fileName) {
+    const transferSheetName = "Transferts";
+    const matriculeSheetName = "Matricules";
+
     let workbook;
-    let worksheet;
-    const sheetName = "Transferts";
+    let transferSheet;
+    let matriculeSheet;
 
     if (fs.existsSync(EXCEL_PATH)) {
         workbook = XLSX.readFile(EXCEL_PATH);
-        worksheet = workbook.Sheets[sheetName];
+
+        transferSheet = workbook.Sheets[transferSheetName];
+        matriculeSheet = workbook.Sheets[matriculeSheetName];
+
+        if (!transferSheet) {
+            transferSheet = XLSX.utils.aoa_to_sheet([
+                ["Matricule", "Nom du fichier", "Date", "Heure"]
+            ]);
+            XLSX.utils.book_append_sheet(workbook, transferSheet, transferSheetName);
+        }
+
+        if (!matriculeSheet) {
+            matriculeSheet = XLSX.utils.aoa_to_sheet([
+                ["Matricule", "Nombre de fichiers", "Date", "Heure"]
+            ]);
+            XLSX.utils.book_append_sheet(workbook, matriculeSheet, matriculeSheetName);
+        }
+
     } else {
         workbook = XLSX.utils.book_new();
-        worksheet = XLSX.utils.aoa_to_sheet([
-            ["Matricule", "Fichiers reçus", "Date", "Heure"]
+
+        transferSheet = XLSX.utils.aoa_to_sheet([
+            ["Matricule", "Nom du fichier", "Date", "Heure"]
         ]);
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+        matriculeSheet = XLSX.utils.aoa_to_sheet([
+            ["Matricule", "Nombre de fichiers", "Date", "Heure"]
+        ]);
+
+        XLSX.utils.book_append_sheet(workbook, transferSheet, transferSheetName);
+        XLSX.utils.book_append_sheet(workbook, matriculeSheet, matriculeSheetName);
     }
 
     const now = new Date();
-    const row = [
-        matricule,
-        totalFiles,
-        now.toLocaleDateString(),
-        now.toLocaleTimeString()
-    ];
+    const date = now.toLocaleDateString();
+    const heure = now.toLocaleTimeString();
 
-    XLSX.utils.sheet_add_aoa(worksheet, [row], { origin: -1 });
+    // =====================================================
+    // FEUILLE TRANSFERTS
+    // =====================================================
+
+    const transferRows = XLSX.utils.sheet_to_json(transferSheet, {
+        header: 1
+    });
+
+    let transferRowIndex = -1;
+
+    for (let i = 1; i < transferRows.length; i++) {
+        if (
+            transferRows[i][0] === matricule &&
+            transferRows[i][1] === fileName
+        ) {
+            transferRowIndex = i;
+            break;
+        }
+    }
+
+    let isNewFile = false;
+
+    if (transferRowIndex === -1) {
+        // Nouveau fichier
+        transferRows.push([
+            matricule,
+            fileName,
+            date,
+            heure
+        ]);
+
+        isNewFile = true;
+    } else {
+        // Fichier déjà existant : mise à jour date/heure
+        transferRows[transferRowIndex][2] = date;
+        transferRows[transferRowIndex][3] = heure;
+    }
+
+    workbook.Sheets[transferSheetName] =
+        XLSX.utils.aoa_to_sheet(transferRows);
+
+    // =====================================================
+    // FEUILLE MATRICULES
+    // =====================================================
+
+    const matriculeRows = XLSX.utils.sheet_to_json(matriculeSheet, {
+        header: 1
+    });
+
+    let matriculeRowIndex = -1;
+
+    for (let i = 1; i < matriculeRows.length; i++) {
+        if (matriculeRows[i][0] === matricule) {
+            matriculeRowIndex = i;
+            break;
+        }
+    }
+
+    if (matriculeRowIndex === -1) {
+
+        // Nouveau matricule
+        matriculeRows.push([
+            matricule,
+            1,
+            date,
+            heure
+        ]);
+
+    } else {
+
+        // Nouveau fichier uniquement
+        if (isNewFile) {
+            matriculeRows[matriculeRowIndex][1] =
+                Number(matriculeRows[matriculeRowIndex][1] || 0) + 1;
+        }
+
+        // Toujours mettre à jour la dernière date/heure
+        matriculeRows[matriculeRowIndex][2] = date;
+        matriculeRows[matriculeRowIndex][3] = heure;
+    }
+
+    workbook.Sheets[matriculeSheetName] =
+        XLSX.utils.aoa_to_sheet(matriculeRows);
+
+    // =====================================================
+    // SAUVEGARDE
+    // =====================================================
+
     XLSX.writeFile(workbook, EXCEL_PATH);
-
-    console.log(`📊 Excel mis à jour → ${matricule}`);
 }
 
 function checkTransferTimeouts(io, notifyTimeout) {
@@ -72,7 +180,7 @@ function checkTransferTimeouts(io, notifyTimeout) {
     for (const [key, transfer] of transfers.entries()) {
         if (transfer.received < transfer.total && transfer.lastActivity) {
             if (now - transfer.lastActivity > TRANSFER_TIMEOUT_MS) {
-                console.log(`⏱️ Transfert timeout: ${key} (${transfer.received}/${transfer.total})`);
+                // console.log(`⏱️ Transfert timeout: ${key} (${transfer.received}/${transfer.total})`);
                 transfer.timedOut = true;
                 const timeoutData = {
                     matricule: transfer.matricule,
@@ -90,9 +198,9 @@ function checkTransferTimeouts(io, notifyTimeout) {
 }
 
 module.exports = function startSocketServer(httpServer, notifyUI, notifyTimeout, getPassword) {
-    console.log("QPDF PATH:", getQpdfPath());
-    console.log("EXISTS:", fs.existsSync(getQpdfPath()));
-    console.log("PASSWORD:", getPassword());
+    // console.log("QPDF PATH:", getQpdfPath());
+    // console.log("EXISTS:", fs.existsSync(getQpdfPath()));
+    // console.log("PASSWORD:", getPassword());
 
     const io = new Server(httpServer, {
         maxHttpBufferSize: 1e8
@@ -137,15 +245,18 @@ module.exports = function startSocketServer(httpServer, notifyUI, notifyTimeout,
             });
 
             const key = `${socket.id}_${matricule}`;
+            const activity = Date.now()
 
             if (!transfers.has(key)) {
                 transfers.set(key, {
                     received: 0,
-                    total,
+                    total: total,
                     receivedNames: new Set(),
                     matricule,
-                    lastActivity: Date.now(),
-                    timedOut: false
+                    lastActivity: activity,
+                    timedOut: false,
+                    times: 0,
+                    socketId: socket.id,
                 });
             }
 
@@ -157,53 +268,97 @@ module.exports = function startSocketServer(httpServer, notifyUI, notifyTimeout,
             }
             transfer.lastActivity = Date.now();
 
-            console.log(
-                `[${matricule}] ${transfer.received}/${transfer.total} → ${fileName}`
-            );
-
             notifyUI({
                 matricule,
-                received: count,
-                total,
+                received: transfer.received,
+                total: transfer.total,
                 files: Array.from(transfer.receivedNames),
                 timedOut: transfer.timedOut
             });
 
-            if (transfer.received === transfer.total) {
-                logTransferToExcel(matricule, transfer.total);
-                if (ack) {
-                    ack({
-                        status: "ok",
-                        message: `Documents ${matricule} reçus`
-                    });
-                }
-                transfers.delete(key);
-                console.log(`[${matricule}] Transfert terminé`);
-            }
-        });
-
-        socket.on("get-transfer-status", ({ matricule }, ack) => {
-            let found = null;
-            for (const [key, transfer] of transfers.entries()) {
-                if (transfer.matricule === matricule && key.startsWith(socket.id)) {
-                    found = transfer;
-                    break;
-                }
-            }
-            if (found) {
+            // if (transfer.received === transfer.total) {
+            logTransferToExcel(matricule, fileName);
+            if (ack) {
                 ack({
                     status: "ok",
-                    received: found.received,
-                    total: found.total,
-                    files: Array.from(found.receivedNames),
-                    timedOut: found.timedOut
-                });
-            } else {
-                ack({
-                    status: "not_found"
+                    message: `Documents ${matricule} reçus`
                 });
             }
+            if (transfer.received === transfer.total) {
+                transfer.completed = true;
+            }
+            console.log(`[${matricule}] Transfert termine`);
+            // }
         });
+        // socket.on("get-transfer-status", ({ matricule, fileName }, ack) => {
+        // socket.on("get-transfer-status", (data, ack) => {
+        //     console.log("GET-STATUS:", data);
+        //     const dir = path.join(
+        //         app.getPath("documents"),
+        //         "PDF-Receiver",
+        //         matricule
+        //     );
+        //     console.log("dir :", dir);
+
+        //     const filePath = path.join(dir, fileName);
+        //     console.log("filePath :", filePath);
+
+        //     ack({
+        //         status: "ok",
+        //         alreadyReceived: fs.existsSync(filePath)
+        //     });
+        // });
+        socket.on("get-transfer-status", ({ matricule, fileNames }, ack) => {
+            console.log("GET-STATUS:", { matricule, fileNames });
+
+            const dir = path.join(
+                app.getPath("documents"),
+                "PDF-Receiver",
+                matricule
+            );
+
+            const existingFiles = [];
+
+            if (Array.isArray(fileNames)) {
+                for (const fileName of fileNames) {
+                    const filePath = path.join(dir, fileName);
+
+                    if (fs.existsSync(filePath)) {
+                        existingFiles.push(fileName);
+                    }
+                }
+            }
+
+            ack({
+                status: "ok",
+                existingFiles
+            });
+        });
+        // socket.on("get-transfer-status", ({ matricule }, ack) => {
+        //     console.log("get-transfer-status", matricule);
+        //     console.trace();
+        //     let found = null;
+        //     for (const [key, transfer] of transfers.entries()) {
+        //         if (transfer.matricule === matricule && key.startsWith(socket.id)) {
+        //             found = transfer;
+        //             break;
+        //         }
+        //     }
+        // if (found) {
+        //     console.log(found)
+        //     ack({
+        //         status: "ok",
+        //         received: found.received,
+        //         total: found.total,
+        //         files: Array.from(found.receivedNames),
+        //         timedOut: found.timedOut
+        //     });
+        // } else {
+        // ack({
+        //     status: "not_found"
+        // });
+        // }
+        // });
 
         socket.on("disconnect", () => {
             console.log("Client disconnected");

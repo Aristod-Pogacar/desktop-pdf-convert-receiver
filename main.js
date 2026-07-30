@@ -65,10 +65,19 @@ app.whenReady().then(() => {
 
     server.listen(3000, () => {
         win.webContents.once("did-finish-load", () => {
+
+            // Premier envoi
             win.webContents.send("ip-address", ip.address());
+
+            // Puis toutes les 5 secondes
+            setInterval(() => {
+                if (win && !win.isDestroyed()) {
+                    win.webContents.send("ip-address", ip.address());
+                }
+            }, 5000);
+
         });
     });
-
     // 🔹 Resume transfer: ask server for status then send remaining files
     ipcMain.handle("resume-transfer", async (event, matricule, currentCount) => {
         return { ok: true, matricule, currentCount };

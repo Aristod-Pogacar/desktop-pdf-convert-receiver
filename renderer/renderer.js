@@ -11,7 +11,7 @@ if (savedPassword && passwordInput) {
 // Sauvegarder automatiquement quand ça change
 if (passwordInput) {
     passwordInput.addEventListener("input", () => {
-        console.log("PASSWORD:", passwordInput.value);
+        // console.log("PASSWORD:", passwordInput.value);
         localStorage.setItem("pdfPassword", passwordInput.value);
     });
 }
@@ -46,10 +46,36 @@ window.electron.onIP((ip) => {
 
 // Mise à jour des transferts
 window.electron.onUpdate((data) => {
-    data.password = getPassword(); // 🔐 ajout ici
-    transfers[data.matricule] = data;
+    console.log("DATA :", data);
+    data.password = getPassword();
+
+    if (!transfers[data.matricule]) {
+        transfers[data.matricule] = data;
+    } else {
+        const t = transfers[data.matricule];
+
+        t.received = data.received;
+        t.total = data.total;
+
+        if (!Array.isArray(t.files))
+            t.files = [];
+
+        if (Array.isArray(data.files)) {
+            const files = new Set([
+                ...t.files,
+                ...data.files
+            ]);
+
+            t.files = [...files];
+        }
+
+        t.timedOut = data.timedOut || t.timedOut;
+    }
+
     renderTransfers();
-});// window.electron.onUpdate((data) => {
+});
+
+// window.electron.onUpdate((data) => {
 //     transfers[data.matricule] = data;
 //     renderTransfers();
 // });
@@ -86,6 +112,7 @@ function renderTransfers() {
     entries.forEach((t) => {
         const li = document.createElement("li");
         li.className = "transfer-item";
+        li.id = "" + t.matricule;
 
         const name = document.createElement("div");
         name.className = "folder-name";
@@ -102,6 +129,19 @@ function renderTransfers() {
             progress.classList.add("timed-out");
             progress.innerText += " (TIMEOUT)";
         }
+        const header = document.createElement("div");
+        header.className = "transfer-header";
+        header.appendChild(name);
+        header.appendChild(progress);
+        const close = document.createElement('div')
+        close.className = 'transfer-actions'
+        close.innerHTML = '<button class="action-btn clear-button" title="Effacer">✕</button>'
+        close.addEventListener('click', () => {
+            delete transfers[li.id];
+            renderTransfers();
+        });
+        header.appendChild(close)
+        li.appendChild(header);
 
         if (Array.isArray(t.files) && t.files.length > 0) {
             const details = document.createElement("div");
@@ -117,8 +157,7 @@ function renderTransfers() {
             li.appendChild(details);
         }
 
-        li.appendChild(name);
-        li.appendChild(progress);
+        // li.appendChild(name);
         transferList.appendChild(li);
     });
 }
